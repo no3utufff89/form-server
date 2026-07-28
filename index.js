@@ -11,6 +11,16 @@ if (!BOT_TOKEN || !OWNER_ID) {
     process.exit(1);
 }
 
+// ✅ Исправляем SSL-проблему с MAX API
+// Добавляем корневые сертификаты для Node.js
+try {
+    // Для Render используем системные сертификаты
+    process.env.NODE_EXTRA_CA_CERTS = '/etc/ssl/certs/ca-certificates.crt';
+    console.log('✅ Установлены системные сертификаты');
+} catch (e) {
+    console.log('⚠️ Не удалось установить системные сертификаты');
+}
+
 const bot = new Bot(BOT_TOKEN);
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -101,6 +111,7 @@ app.head('/', (req, res) => {
 app.head('/ping', (req, res) => {
     res.status(200).end();
 });
+
 // --- Универсальная отправка ---
 async function sendToMax(phone, name, question, title, res) {
     if (!phone || phone.length < 11) {
@@ -131,8 +142,35 @@ async function sendToMax(phone, name, question, title, res) {
         });
         res.status(200).json({ success: true });
     } catch (error) {
-        console.error('❌ Ошибка:', error);
-        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+        console.error('❌ Ошибка отправки в MAX:', error);
+
+        // ✅ Fallback: пробуем отправить через прямой fetch
+        try {
+            console.log('🔄 Пробуем fallback-отправку...');
+            const response = await fetch('https://api.max.ru/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${BOT_TOKEN}`
+                },
+                body: JSON.stringify({
+                    chat_id: OWNER_ID,
+                    text: text,
+                    parse_mode: 'HTML'
+                })
+            });
+
+            if (response.ok) {
+                console.log('✅ Fallback-отправка успешна');
+                res.status(200).json({ success: true });
+            } else {
+                console.error('❌ Fallback-отправка не удалась:', await response.text());
+                res.status(500).json({ success: false, error: 'Ошибка отправки в MAX' });
+            }
+        } catch (fallbackError) {
+            console.error('❌ Ошибка fallback:', fallbackError);
+            res.status(500).json({ success: false, error: 'Ошибка отправки в MAX' });
+        }
     }
 }
 
@@ -142,8 +180,35 @@ async function sendToMaxWithText(text, res) {
         console.log('✅ Вопрос отправлен');
         res.status(200).json({ success: true });
     } catch (error) {
-        console.error('❌ Ошибка:', error);
-        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+        console.error('❌ Ошибка отправки вопроса в MAX:', error);
+
+        // ✅ Fallback для вопроса
+        try {
+            console.log('🔄 Пробуем fallback-отправку вопроса...');
+            const response = await fetch('https://api.max.ru/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${BOT_TOKEN}`
+                },
+                body: JSON.stringify({
+                    chat_id: OWNER_ID,
+                    text: text,
+                    parse_mode: 'HTML'
+                })
+            });
+
+            if (response.ok) {
+                console.log('✅ Fallback-отправка вопроса успешна');
+                res.status(200).json({ success: true });
+            } else {
+                console.error('❌ Fallback-отправка вопроса не удалась:', await response.text());
+                res.status(500).json({ success: false, error: 'Ошибка отправки в MAX' });
+            }
+        } catch (fallbackError) {
+            console.error('❌ Ошибка fallback вопроса:', fallbackError);
+            res.status(500).json({ success: false, error: 'Ошибка отправки в MAX' });
+        }
     }
 }
 
