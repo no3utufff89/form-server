@@ -95,7 +95,12 @@ app.post('/question-request', async (req, res) => {
 app.get('/ping', (req, res) => {
     res.status(200).send('ok');
 });
-
+app.head('/', (req, res) => {
+    res.status(200).end();
+});
+app.head('/ping', (req, res) => {
+    res.status(200).end();
+});
 // --- Универсальная отправка ---
 async function sendToMax(phone, name, question, title, res) {
     if (!phone || phone.length < 11) {
