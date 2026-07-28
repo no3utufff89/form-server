@@ -14,7 +14,7 @@ if (!BOT_TOKEN || !OWNER_ID) {
 const bot = new Bot(BOT_TOKEN);
 const app = express();
 const PORT = process.env.PORT || 3003;
-
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
